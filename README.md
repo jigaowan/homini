@@ -6,38 +6,51 @@ Homini is a **minimalist dotfiles manager** using Nix inspired by
 
 ## How to use Homini?
 
-Consider the following snipet
+Consider the following snippet
 
 ```nix
 homini = {
   enable = true;
   dir = ./dotfiles;
+
+  file.xdg_config."git".source = ".config/git";
+  file.xdg_config."keyd".source = ".config/keyd";
+  file.xdg_config."zed/settings.json".text = ''
+    {
+      "theme": "Ayu Dark"
+    }
+  '';
 };
 ```
 
-this will link the `dotfiles` directory
+This will link explicit entries from `dotfiles` into `$XDG_CONFIG_HOME`
+or `$HOME/.config`.
 
 ```
 dotfiles
 └── .config
-    └── git
-        ├── config
-        ├── ignore
-        ├── personal
-        └── work
+    ├── git
+    │   ├── config
+    │   ├── ignore
+    │   ├── personal
+    │   └── work
+    └── keyd
+        └── default.conf
 ```
 
-to your `$HOME` directory.
+The resulting managed paths look like this:
 
 ```
-$HOME
-└── .config
-    └── git
-        ├── config -> /nix/store/xqj0sf5q4q35q1hp19yyhfp8sbp0zrwa-dotfiles/.config/git/config
-        ├── ignore -> /nix/store/xqj0sf5q4q35q1hp19yyhfp8sbp0zrwa-dotfiles/.config/git/ignore
-        ├── personal -> /nix/store/xqj0sf5q4q35q1hp19yyhfp8sbp0zrwa-dotfiles/.config/git/personal
-        └── work -> /nix/store/xqj0sf5q4q35q1hp19yyhfp8sbp0zrwa-dotfiles/.config/git/work
+$XDG_CONFIG_HOME
+├── git -> /nix/store/...-dotfiles/.config/git
+├── keyd -> /nix/store/...-dotfiles/.config/keyd
+└── zed
+    ├── settings.json -> /nix/store/...-homini-zed-settings.json
+    └── history.json
 ```
+
+`history.json` is left untouched because Homini only manages the paths you
+declare.
 
 ### NixOS
 
@@ -62,6 +75,12 @@ Rebuild the following flake with `nixos-rebuild switch --flake .#machine`.
           homini = {
             enable = true;
             dir = ./dotfiles;
+            file.xdg_config."git".source = ".config/git";
+            file.xdg_config."zed/settings.json".text = ''
+              {
+                "theme": "Ayu Dark"
+              }
+            '';
           };
         }
       ];
@@ -95,6 +114,7 @@ Rebuild the following flake with `darwin-rebuild switch --flake .#machine`.
           homini = {
             enable = true;
             dir = ./dotfiles;
+            file.xdg_config."git".source = ".config/git";
           };
         }
       ];
@@ -126,6 +146,7 @@ Run the following flake with `nix run`.
         default = homini.standalone {
           pkgs = nixpkgs.legacyPackages.${system};
           dir = ./dotfiles;
+          file.xdg_config."git".source = ".config/git";
         };
       });
     };
