@@ -50,9 +50,52 @@ pkgs.writeShellScript "activation-script" ''
     esac
   }
 
+  resolve_source_path() {
+    local mode=$1
+    local source_spec=$2
+
+    case "$mode" in
+      source)
+        if [[ "$source_spec" = /* ]]; then
+          printf '%s\n' "$source_spec"
+        else
+          printf '%s/%s\n' "$HOME" "$source_spec"
+        fi
+        ;;
+      text)
+        printf '%s\n' "$source_spec"
+        ;;
+      *)
+        log_error "unknown source mode: $mode"
+        return 1
+        ;;
+    esac
+  }
+
+  detect_source_kind() {
+    local source_path=$1
+
+    if [[ -d "$source_path" ]]; then
+      printf '%s\n' directory
+    elif [[ -f "$source_path" ]]; then
+      printf '%s\n' file
+    else
+      log_error "source path does not exist: $source_path"
+      return 1
+    fi
+  }
+
   create_link() {
     local src_path=$1
     local dst_path=$2
+    local canonical_src canonical_dst
+
+    canonical_src="$(readlink -m -- "$src_path")"
+    canonical_dst="$(readlink -m -- "$dst_path")"
+    if [[ "$canonical_src" == "$canonical_dst" ]]; then
+      log_error "refusing to link path to itself: $dst_path"
+      return 1
+    fi
 
     mkdir -p "$(dirname "$dst_path")"
 
@@ -68,20 +111,21 @@ pkgs.writeShellScript "activation-script" ''
   cleanup_old_entries() {
     [[ -e "$old_manifest" ]] || return
 
-    while IFS=$'\t' read -r namespace target_rel kind mode store_path || [[ -n "$namespace" ]]; do
+    while IFS=$'\t' read -r namespace target_rel kind mode source_spec || [[ -n "$namespace" ]]; do
       local key="''${namespace}:''${target_rel}"
-      local dst_path current_path
+      local dst_path current_path source_path
 
       [[ -z "$namespace" ]] && continue
-      if [[ -n "''${new_entries[$key]+x}" && "''${new_entries[$key]}" == "$kind"$'\t'"$mode"$'\t'"$store_path" ]]; then
+      if [[ -n "''${new_entries[$key]+x}" && "''${new_entries[$key]}" == "$kind"$'\t'"$mode"$'\t'"$source_spec" ]]; then
         continue
       fi
 
       dst_path="$(resolve_target_path "$namespace" "$target_rel")" || return 1
       [[ -L "$dst_path" ]] || continue
 
-      current_path="$(readlink -e "$dst_path" || true)"
-      [[ "$current_path" == "$store_path" ]] || continue
+      source_path="$(resolve_source_path "$mode" "$source_spec")" || return 1
+      current_path="$(readlink -- "$dst_path" || true)"
+      [[ "$current_path" == "$source_path" ]] || continue
       rm "$dst_path"
     done < "$old_manifest"
   }
@@ -92,21 +136,23 @@ pkgs.writeShellScript "activation-script" ''
   }
 
   load_new_entries() {
-    while IFS=$'\t' read -r namespace target_rel kind mode store_path || [[ -n "$namespace" ]]; do
+    while IFS=$'\t' read -r namespace target_rel kind mode source_spec || [[ -n "$namespace" ]]; do
       local key="''${namespace}:''${target_rel}"
       [[ -z "$namespace" ]] && continue
-      new_entries[$key]="$kind"$'\t'"$mode"$'\t'"$store_path"
+      new_entries[$key]="$kind"$'\t'"$mode"$'\t'"$source_spec"
     done < "$new_manifest"
   }
 
   link_new_entries() {
-    local key namespace target_rel kind mode store_path dst_path
+    local key namespace target_rel kind mode source_spec dst_path source_path
 
     for key in "''${!new_entries[@]}"; do
       IFS=: read -r namespace target_rel <<< "$key"
-      IFS=$'\t' read -r kind mode store_path <<< "''${new_entries[$key]}"
+      IFS=$'\t' read -r kind mode source_spec <<< "''${new_entries[$key]}"
       dst_path="$(resolve_target_path "$namespace" "$target_rel")" || return 1
-      create_link "$store_path" "$dst_path"
+      source_path="$(resolve_source_path "$mode" "$source_spec")" || return 1
+      detect_source_kind "$source_path" > /dev/null || return 1
+      create_link "$source_path" "$dst_path" || return 1
     done
   }
 

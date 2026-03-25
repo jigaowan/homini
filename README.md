@@ -9,12 +9,11 @@ Homini is a **minimalist dotfiles manager** using Nix inspired by
 Consider the following snippet
 
 ```nix
-homini = {
+users.users.alice.homini = {
   enable = true;
-  dir = ./dotfiles;
 
-  file.xdg_config."git".source = ".config/git";
-  file.xdg_config."keyd".source = ".config/keyd";
+  file.xdg_config."git".source = ".dotfiles/.config/git";
+  file.xdg_config."keyd".source = ".dotfiles/.config/keyd";
   file.xdg_config."zed/settings.json".text = ''
     {
       "theme": "Ayu Dark"
@@ -23,8 +22,11 @@ homini = {
 };
 ```
 
-This will link explicit entries from `dotfiles` into `$XDG_CONFIG_HOME`
-or `$HOME/.config`.
+Relative `source` paths are resolved from the target user's home directory.
+Absolute `source` paths are used as-is.
+
+This will link explicit entries from `~/.dotfiles` into Alice's
+`$XDG_CONFIG_HOME` or `$HOME/.config`.
 
 ```
 dotfiles
@@ -72,15 +74,19 @@ Rebuild the following flake with `nixos-rebuild switch --flake .#machine`.
       modules = [
         ./configuration.nix
         homini.nixosModules.homini {
-          homini = {
+          users.users.alice.homini = {
             enable = true;
-            dir = ./dotfiles;
-            file.xdg_config."git".source = ".config/git";
+            file.xdg_config."git".source = ".dotfiles/.config/git";
             file.xdg_config."zed/settings.json".text = ''
               {
                 "theme": "Ayu Dark"
               }
             '';
+          };
+
+          users.users.bob.homini = {
+            enable = true;
+            file.xdg_config."git".source = "/srv/shared/git-config";
           };
         }
       ];
@@ -111,10 +117,13 @@ Rebuild the following flake with `darwin-rebuild switch --flake .#machine`.
       modules = [
         ./configuration.nix
         homini.darwinModules.homini {
-          homini = {
-            enable = true;
-            dir = ./dotfiles;
-            file.xdg_config."git".source = ".config/git";
+          users.users.alice = {
+            home = "/Users/alice";
+
+            homini = {
+              enable = true;
+              file.xdg_config."git".source = ".dotfiles/.config/git";
+            };
           };
         }
       ];
@@ -145,8 +154,7 @@ Run the following flake with `nix run`.
       packages = forAllSystems (system: {
         default = homini.standalone {
           pkgs = nixpkgs.legacyPackages.${system};
-          dir = ./dotfiles;
-          file.xdg_config."git".source = ".config/git";
+          file.xdg_config."git".source = ".dotfiles/.config/git";
         };
       });
     };

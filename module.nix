@@ -7,12 +7,27 @@
 
 let
   cfg = config.homini;
-  isRelativePath =
+  normalizeSource =
+    value:
+    if builtins.isPath value then
+      toString value
+    else
+      value;
+
+  isSinglePathValue =
     value:
     value != ""
-    && !lib.hasPrefix "/" value
     && !lib.hasInfix "\n" value
-    && !lib.hasInfix "\t" value
+    && !lib.hasInfix "\t" value;
+
+  isAbsolutePath =
+    value:
+    lib.hasPrefix "/" value;
+
+  isRelativePath =
+    value:
+    isSinglePathValue value
+    && !lib.hasPrefix "/" value
     && !lib.any (segment: segment == "..") (lib.splitString "/" value);
 
   isRelativeTarget =
@@ -29,10 +44,11 @@ let
     {
       options = {
         source = lib.mkOption {
-          type = lib.types.nullOr lib.types.str;
+          type = lib.types.nullOr (lib.types.either lib.types.str lib.types.path);
           default = null;
           description = ''
-            Relative path inside homini.dir for a managed file or directory.
+            Relative path inside the target user's home directory, or an absolute path
+            to a managed file or directory.
           '';
         };
 
@@ -59,9 +75,17 @@ let
           '';
         }
         {
-          assertion = config.source == null || isRelativePath config.source;
+          assertion =
+            config.source == null
+            || (
+              let
+                source = normalizeSource config.source;
+              in
+              isSinglePathValue source && (isAbsolutePath source || isRelativePath source)
+            );
           message = ''
-            homini.file.xdg_config."${name}".source must be a relative path inside homini.dir.
+            homini.file.xdg_config."${name}".source must be an absolute path or a relative
+            path inside the target user's home directory.
           '';
         }
       ];
@@ -69,14 +93,7 @@ let
 in
 {
   options.homini = {
-    enable = lib.mkEnableOption ''Enable homini.'';
-
-    dir = lib.mkOption {
-      type = lib.types.path;
-      description = ''
-        The root directory used to resolve homini.file.*.source paths.
-      '';
-    };
+    enable = lib.mkEnableOption ''Enable homini for this user.'';
 
     file = lib.mkOption {
       default = { };
@@ -103,10 +120,9 @@ in
     };
   };
 
-  config = {
+  config = lib.mkIf cfg.enable {
     homini.activationPackage = import ./package.nix {
       inherit lib pkgs;
-      dir = cfg.dir;
       file = cfg.file;
     };
   };

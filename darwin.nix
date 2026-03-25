@@ -1,14 +1,41 @@
 { config, lib, ... }:
 
 let
-  cfg = config.homini;
+  hominiUserModule = import ./module.nix;
+  enabledUsers = lib.filterAttrs (_: userCfg: userCfg.homini.enable or false) config.users.users;
 in
 {
-  imports = [ ./module.nix ];
+  options.users.users = lib.mkOption {
+    type = lib.types.attrsOf (lib.types.submodule [ hominiUserModule ]);
+  };
 
-  config = lib.mkIf cfg.enable {
-    system.activationScripts.postUserActivation.text = ''
-      "${cfg.activationPackage}/bin/homini"
-    '';
+  config = {
+    assertions = lib.mapAttrsToList (
+      name: userCfg:
+      {
+        assertion = !userCfg.homini.enable || userCfg.home != null;
+        message = ''
+          users.users."${name}".home must be set when users.users."${name}".homini.enable is true.
+        '';
+      }
+    ) config.users.users;
+
+    system.activationScripts = lib.mapAttrs' (
+      name: userCfg:
+      let
+        home = toString userCfg.home;
+        xdgConfigHome = "${home}/.config";
+        xdgStateHome = "${home}/.local/state";
+      in
+      lib.nameValuePair "homini-${name}" {
+        text = ''
+          /usr/bin/sudo -u ${lib.escapeShellArg name} /usr/bin/env \
+            HOME=${lib.escapeShellArg home} \
+            XDG_CONFIG_HOME=${lib.escapeShellArg xdgConfigHome} \
+            XDG_STATE_HOME=${lib.escapeShellArg xdgStateHome} \
+            "${userCfg.homini.activationPackage}/bin/homini"
+        '';
+      }
+    ) enabledUsers;
   };
 }
