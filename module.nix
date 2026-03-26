@@ -38,7 +38,6 @@ let
   fileEntryModule =
     {
       name,
-      config,
       ...
     }:
     {
@@ -60,35 +59,6 @@ let
           '';
         };
       };
-
-      config.assertions = [
-        {
-          assertion = (config.source != null) != (config.text != null);
-          message = ''
-            homini.file.xdg_config."${name}" must set exactly one of source or text.
-          '';
-        }
-        {
-          assertion = isRelativeTarget name;
-          message = ''
-            homini.file.xdg_config."${name}" must be a relative path inside XDG_CONFIG_HOME.
-          '';
-        }
-        {
-          assertion =
-            config.source == null
-            || (
-              let
-                source = normalizeSource config.source;
-              in
-              isSinglePathValue source && (isAbsolutePath source || isRelativePath source)
-            );
-          message = ''
-            homini.file.xdg_config."${name}".source must be an absolute path or a relative
-            path inside the target user's home directory.
-          '';
-        }
-      ];
     };
 in
 {
