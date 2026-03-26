@@ -25,22 +25,24 @@ in
       }
     ) config.users.users;
 
-    system.activationScripts = lib.mapAttrs' (
-      name: userCfg:
-      let
-        home = toString userCfg.home;
-        xdgConfigHome = "${home}/.config";
-        xdgStateHome = "${home}/.local/state";
-      in
-      lib.nameValuePair "homini-${name}" {
-        text = ''
-          /usr/bin/sudo -u ${lib.escapeShellArg name} /usr/bin/env \
-            HOME=${lib.escapeShellArg home} \
-            XDG_CONFIG_HOME=${lib.escapeShellArg xdgConfigHome} \
-            XDG_STATE_HOME=${lib.escapeShellArg xdgStateHome} \
-            "${userCfg.homini.activationPackage}/bin/homini"
-        '';
-      }
-    ) enabledUsers;
+    system.activationScripts.postActivation.text = lib.mkAfter (
+      lib.concatStringsSep "\n" (
+        lib.mapAttrsToList (
+          name: userCfg:
+          let
+            home = toString userCfg.home;
+            xdgConfigHome = "${home}/.config";
+            xdgStateHome = "${home}/.local/state";
+          in
+          ''
+            /usr/bin/sudo -u ${lib.escapeShellArg name} /usr/bin/env \
+              HOME=${lib.escapeShellArg home} \
+              XDG_CONFIG_HOME=${lib.escapeShellArg xdgConfigHome} \
+              XDG_STATE_HOME=${lib.escapeShellArg xdgStateHome} \
+              "${userCfg.homini.activationPackage}/bin/homini"
+          ''
+        ) enabledUsers
+      )
+    );
   };
 }
