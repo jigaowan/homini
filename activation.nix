@@ -40,6 +40,9 @@ pkgs.writeShellScript "activation-script" ''
     local target_rel=$2
 
     case "$namespace" in
+      home)
+        printf '%s/%s\n' "$HOME" "$target_rel"
+        ;;
       xdg_config)
         printf '%s/%s\n' "$xdg_config_home" "$target_rel"
         ;;

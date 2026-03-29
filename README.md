@@ -10,6 +10,7 @@ Consider the following snippet
 
 ```nix
 users.users.alice.homini = {
+  file.home.".zshrc".source = ".dotfiles/.zshrc";
   file.xdg_config."git".source = ".dotfiles/.config/git";
   file.xdg_config."keyd".source = ".dotfiles/.config/keyd";
   file.xdg_config."zed/settings.json".text = ''
@@ -25,8 +26,11 @@ Defining `users.users.<name>.homini` enables Homini automatically for that user.
 Relative `source` paths are resolved from the target user's home directory.
 Absolute `source` paths are used as-is.
 
-This will link explicit entries from `~/.dotfiles` into Alice's
-`$XDG_CONFIG_HOME` or `$HOME/.config`.
+`file.home` links entries into `$HOME`.
+`file.xdg_config` links entries into `$XDG_CONFIG_HOME` or `$HOME/.config`.
+
+This will link explicit entries from `~/.dotfiles` into Alice's home directory
+and config directory.
 
 ```
 dotfiles
@@ -43,11 +47,24 @@ dotfiles
 The resulting managed paths look like this:
 
 ```
+$HOME
+├── .zshrc -> /nix/store/...-dotfiles/.zshrc
+└── .config
+    ├── git -> /nix/store/...-dotfiles/.config/git
+    ├── keyd -> /nix/store/...-dotfiles/.config/keyd
+    └── zed
+        ├── settings.json -> /nix/store/...-homini-xdg-config-zed-settings.json
+        └── history.json
+```
+
+Or, equivalently:
+
+```
 $XDG_CONFIG_HOME
 ├── git -> /nix/store/...-dotfiles/.config/git
 ├── keyd -> /nix/store/...-dotfiles/.config/keyd
 └── zed
-    ├── settings.json -> /nix/store/...-homini-zed-settings.json
+    ├── settings.json -> /nix/store/...-homini-xdg-config-zed-settings.json
     └── history.json
 ```
 
@@ -75,6 +92,7 @@ Rebuild the following flake with `nixos-rebuild switch --flake .#machine`.
         ./configuration.nix
         homini.nixosModules.homini {
           users.users.alice.homini = {
+            file.home.".zshrc".source = ".dotfiles/.zshrc";
             file.xdg_config."git".source = ".dotfiles/.config/git";
             file.xdg_config."zed/settings.json".text = ''
               {
@@ -119,6 +137,7 @@ Rebuild the following flake with `darwin-rebuild switch --flake .#machine`.
             home = "/Users/alice";
 
             homini = {
+              file.home.".zshrc".source = ".dotfiles/.zshrc";
               file.xdg_config."git".source = ".dotfiles/.config/git";
             };
           };
@@ -151,6 +170,7 @@ Run the following flake with `nix run`.
       packages = forAllSystems (system: {
         default = homini.standalone {
           pkgs = nixpkgs.legacyPackages.${system};
+          file.home.".zshrc".source = ".dotfiles/.zshrc";
           file.xdg_config."git".source = ".dotfiles/.config/git";
         };
       });

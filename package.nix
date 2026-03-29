@@ -6,7 +6,18 @@
 
 let
   activation-script = pkgs.callPackage ./activation.nix { };
-  xdgConfig = if file ? xdg_config then file.xdg_config else { };
+  namespaces = {
+    home = {
+      entries = if file ? home then file.home else { };
+      targetDescription = "the target user's home directory";
+      targetVariable = "$HOME";
+    };
+    xdg_config = {
+      entries = if file ? xdg_config then file.xdg_config else { };
+      targetDescription = "XDG_CONFIG_HOME";
+      targetVariable = "$XDG_CONFIG_HOME";
+    };
+  };
   normalizeSource =
     value:
     if builtins.isPath value then
@@ -40,12 +51,13 @@ let
     && !lib.hasSuffix "/" value;
 
   normalizeEntry =
-    targetRel: entry:
+    namespace: namespaceConfig: targetRel: entry:
     let
       hasSource = entry ? source && entry.source != null;
       hasText = entry ? text && entry.text != null;
       textPath = pkgs.writeText (
-        lib.strings.sanitizeDerivationName "homini-${lib.replaceStrings [ "/" ] [ "-" ] targetRel}"
+        lib.strings.sanitizeDerivationName
+          "homini-${namespace}-${lib.replaceStrings [ "/" ] [ "-" ] targetRel}"
       ) entry.text;
       sourceSpec =
         if hasSource then
@@ -56,10 +68,10 @@ let
       kind = if hasSource then "runtime" else "file";
       _ =
         assert lib.assertMsg (isRelativeTarget targetRel) ''
-          homini.file.xdg_config."${targetRel}" must be a relative path inside XDG_CONFIG_HOME.
+          homini.file.${namespace}."${targetRel}" must be a relative path inside ${namespaceConfig.targetVariable}.
         '';
         assert lib.assertMsg (hasSource != hasText) ''
-          homini.file.xdg_config."${targetRel}" must set exactly one of source or text.
+          homini.file.${namespace}."${targetRel}" must set exactly one of source or text.
         '';
         assert lib.assertMsg (
           !hasSource
@@ -70,8 +82,8 @@ let
             isSinglePathValue source && (isAbsolutePath source || isRelativePath source)
           )
         ) ''
-          homini.file.xdg_config."${targetRel}".source must be an absolute path or a relative
-          path inside the target user's home directory.
+          homini.file.${namespace}."${targetRel}".source must be an absolute path or a relative
+          path inside ${namespaceConfig.targetDescription}.
         '';
         true;
     in
@@ -84,12 +96,17 @@ let
         ;
     };
 
-  manifestLines = lib.concatStringsSep "\n" (
-    map (
-      entry:
-      "xdg_config\t${entry.targetRel}\t${entry.kind}\t${entry.mode}\t${entry.sourceSpec}"
-    ) (lib.mapAttrsToList normalizeEntry xdgConfig)
+  manifestEntries = lib.concatLists (
+    lib.mapAttrsToList (
+      namespace: namespaceConfig:
+      map (
+        entry:
+        "${namespace}\t${entry.targetRel}\t${entry.kind}\t${entry.mode}\t${entry.sourceSpec}"
+      ) (lib.mapAttrsToList (normalizeEntry namespace namespaceConfig) namespaceConfig.entries)
+    ) namespaces
   );
+
+  manifestLines = lib.concatStringsSep "\n" manifestEntries;
 in
 pkgs.runCommand "homini" { } ''
   mkdir -p $out/bin

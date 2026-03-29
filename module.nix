@@ -69,12 +69,22 @@ in
         Declarative file entries managed by homini.
       '';
       type = lib.types.submodule {
-        options.xdg_config = lib.mkOption {
-          default = { };
-          description = ''
-            Entries linked into $XDG_CONFIG_HOME or $HOME/.config.
-          '';
-          type = lib.types.attrsOf (lib.types.submodule fileEntryModule);
+        options = {
+          home = lib.mkOption {
+            default = { };
+            description = ''
+              Entries linked directly into the target user's home directory.
+            '';
+            type = lib.types.attrsOf (lib.types.submodule fileEntryModule);
+          };
+
+          xdg_config = lib.mkOption {
+            default = { };
+            description = ''
+              Entries linked into $XDG_CONFIG_HOME or $HOME/.config.
+            '';
+            type = lib.types.attrsOf (lib.types.submodule fileEntryModule);
+          };
         };
       };
     };
