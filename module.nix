@@ -6,7 +6,7 @@
 }:
 
 let
-  cfg = config.homini;
+  cfg = config;
   normalizeSource =
     value:
     if builtins.isPath value then
@@ -62,9 +62,7 @@ let
     };
 in
 {
-  options.homini = {
-    enable = lib.mkEnableOption ''Enable homini for this user.'';
-
+  options = {
     file = lib.mkOption {
       default = { };
       description = ''
@@ -90,8 +88,8 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    homini.activationPackage = import ./package.nix {
+  config = {
+    activationPackage = import ./package.nix {
       inherit lib pkgs;
       file = cfg.file;
     };

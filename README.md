@@ -10,8 +10,6 @@ Consider the following snippet
 
 ```nix
 users.users.alice.homini = {
-  enable = true;
-
   file.xdg_config."git".source = ".dotfiles/.config/git";
   file.xdg_config."keyd".source = ".dotfiles/.config/keyd";
   file.xdg_config."zed/settings.json".text = ''
@@ -21,6 +19,8 @@ users.users.alice.homini = {
   '';
 };
 ```
+
+Defining `users.users.<name>.homini` enables Homini automatically for that user.
 
 Relative `source` paths are resolved from the target user's home directory.
 Absolute `source` paths are used as-is.
@@ -75,7 +75,6 @@ Rebuild the following flake with `nixos-rebuild switch --flake .#machine`.
         ./configuration.nix
         homini.nixosModules.homini {
           users.users.alice.homini = {
-            enable = true;
             file.xdg_config."git".source = ".dotfiles/.config/git";
             file.xdg_config."zed/settings.json".text = ''
               {
@@ -85,7 +84,6 @@ Rebuild the following flake with `nixos-rebuild switch --flake .#machine`.
           };
 
           users.users.bob.homini = {
-            enable = true;
             file.xdg_config."git".source = "/srv/shared/git-config";
           };
         }
@@ -121,7 +119,6 @@ Rebuild the following flake with `darwin-rebuild switch --flake .#machine`.
             home = "/Users/alice";
 
             homini = {
-              enable = true;
               file.xdg_config."git".source = ".dotfiles/.config/git";
             };
           };

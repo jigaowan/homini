@@ -1,13 +1,27 @@
 { config, lib, pkgs, ... }:
 
 let
-  hominiUserModule = import ./module.nix;
-  hominiUserType = lib.types.submoduleWith {
-    modules = [ hominiUserModule ];
+  hominiConfigModule = import ./module.nix;
+  hominiConfigType = lib.types.submoduleWith {
+    modules = [ hominiConfigModule ];
     specialArgs = { inherit pkgs; };
     shorthandOnlyDefinesConfig = true;
   };
-  enabledUsers = lib.filterAttrs (_: userCfg: userCfg.homini.enable or false) config.users.users;
+  hominiUserType = lib.types.submoduleWith {
+    modules = [
+      {
+        options.homini = lib.mkOption {
+          type = lib.types.nullOr hominiConfigType;
+          default = null;
+          description = ''
+            Homini configuration for this user.
+          '';
+        };
+      }
+    ];
+    shorthandOnlyDefinesConfig = true;
+  };
+  enabledUsers = lib.filterAttrs (_: userCfg: userCfg.homini != null) config.users.users;
 in
 {
   options.users.users = lib.mkOption {
