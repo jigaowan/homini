@@ -83,11 +83,11 @@ pkgs.writeShellScript "activation-script" ''
   create_link() {
     local src_path=$1
     local dst_path=$2
-    local canonical_src canonical_dst
+    local canonical_src canonical_dst_path
 
     canonical_src="$(readlink -m -- "$src_path")"
-    canonical_dst="$(readlink -m -- "$dst_path")"
-    if [[ "$canonical_src" == "$canonical_dst" ]]; then
+    canonical_dst_path="$(readlink -m -- "$(dirname "$dst_path")")/$(basename "$dst_path")"
+    if [[ "$canonical_src" == "$canonical_dst_path" ]]; then
       log_error "refusing to link path to itself: $dst_path"
       return 1
     fi
