@@ -27,14 +27,6 @@ pkgs.writeShellScript "activation-script" ''
   new_path="@OUT@"
   new_manifest="$(readlink -e "$new_path/manifest")"
 
-  if [[ -n "$old_manifest" && "$old_manifest" != "$new_manifest" ]] && cmp -s "$old_manifest" "$new_manifest"; then
-    log_info "no managed file changes"; exit 0
-  fi
-
-  if [[ "$old_path" == "$new_path" ]]; then
-    log_info "no dotfiles changes"; exit 0
-  fi
-
   resolve_target_path() {
     local namespace=$1
     local target_rel=$2
@@ -146,6 +138,22 @@ pkgs.writeShellScript "activation-script" ''
     done < "$new_manifest"
   }
 
+  all_entries_current() {
+    local key namespace target_rel kind mode source_spec dst_path source_path current_path
+
+    for key in "''${!new_entries[@]}"; do
+      IFS=: read -r namespace target_rel <<< "$key"
+      IFS=$'\t' read -r kind mode source_spec <<< "''${new_entries[$key]}"
+      dst_path="$(resolve_target_path "$namespace" "$target_rel")" || return 1
+      [[ -L "$dst_path" ]] || return 1
+
+      source_path="$(resolve_source_path "$mode" "$source_spec")" || return 1
+      detect_source_kind "$source_path" > /dev/null || return 1
+      current_path="$(readlink -- "$dst_path" || true)"
+      [[ "$current_path" == "$source_path" ]] || return 1
+    done
+  }
+
   link_new_entries() {
     local key namespace target_rel kind mode source_spec dst_path source_path
 
@@ -162,6 +170,17 @@ pkgs.writeShellScript "activation-script" ''
   declare -A new_entries=()
 
   load_new_entries
+
+  if all_entries_current; then
+    if [[ -n "$old_manifest" && "$old_manifest" != "$new_manifest" ]] && cmp -s "$old_manifest" "$new_manifest"; then
+      log_info "no managed file changes"; exit 0
+    fi
+
+    if [[ "$old_path" == "$new_path" ]]; then
+      log_info "no dotfiles changes"; exit 0
+    fi
+  fi
+
   cleanup_old_entries
   switch_gcroots
   link_new_entries
